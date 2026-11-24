@@ -22,8 +22,8 @@ This is an oracle/tooling project, not a second engine implementation.
   remaining playable after the warning is dismissed. Record and dismiss that
   warning with OK, then verify the actual game window. Stop only if no playable
   window follows. Do not bypass or alter the game's device check.
-- Original assets and save bytes never enter Git. `.gmc`/`.sav`, captures and
-  generated outputs are ignored.
+- Original assets and save bytes never enter Git. `.gmc`/`.gms`/`.sav`,
+  captures and generated outputs are ignored.
 - Exported saves are copied to rt3engine's gitignored `review-tmp/saves/`
   area **only when a private transfer is actually possible and requested**.
   A pure Windows installation uses its own private output directory named by
@@ -47,6 +47,64 @@ New-Item -ItemType Directory -Force $env:RT3_PRIVATE_OUT | Out-Null
 & 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe' .\scripts\Probe-RT3.ahk (Join-Path $env:RT3_PRIVATE_OUT 'probe.txt')
 ```
 
-The next milestone is a deterministic, non-destructive controlled-save script
-with proof of the produced file and state. That remains unimplemented until it
-has been run on a suitable Windows session.
+## Controlled-save building blocks
+
+The input/capture techniques encapsulated by these helpers were used
+successfully on 2026-11-24. The current scripts add window/size guards and have
+passed their missing-window negative-path checks; their positive-path rerun
+awaits verified save-path isolation. They are building blocks, **not an
+untested claim of one-shot start-to-save orchestration**:
+
+- `Invoke-RT3Click.ahk` restores/activates RT3, refuses any client size other
+  than 800×600, then uses fixed client coordinates with a slow pointer move.
+- `Invoke-RT3Key.ahk` and `Invoke-RT3Text.ahk` send keyboard input and literal
+  text to the restored/active game window.
+- `Capture-RT3Window.ps1` captures only the RT3 window through Windows GDI;
+  captures go to the requested private output path.
+
+```powershell
+$ahk = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
+$title = 'Railroad Tycoon 3'
+$log = Join-Path $env:RT3_PRIVATE_OUT 'input.log'
+& $ahk .\scripts\Invoke-RT3Click.ahk 438 138 $title $log 1
+& $ahk .\scripts\Invoke-RT3Key.ahk '{Enter}' $title $log
+& $ahk .\scripts\Invoke-RT3Text.ahk 'rt3a204828' $title $log
+& .\scripts\Capture-RT3Window.ps1 -OutputPath (Join-Path $env:RT3_PRIVATE_OUT 'state.png')
+```
+
+The successful scenario route was Single Player `(365,235)`, New Scenario
+`(365,293)`, Start British Isles `(370,445)`, then `Return` for the briefing.
+The company prompt required a double-click at `(500,442)`, and its default OK
+required a double-click at `(330,456)`. Capture and verify after each state
+transition rather than replaying the sequence blindly.
+
+From active gameplay, `Escape` opened the system menu. Save's **center** is
+`(438,138)`; clicking its left edge did nothing. In the Save dialog, click the
+filename field at `(390,348)`, enter a short unique name, and press `Return`.
+The game truncated one long requested name to 25 characters, so use a short
+name and check for an existing file before saving. A saved file and its hash,
+not a screenshot alone, are the proof of success.
+
+### Native save-path isolation requirement
+
+A disposable copy at `RT3_HOME` is not enough. This GOG installation reads
+`HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\1445251062`, including `PATH` and
+`SAVEGAMEFOLDER`; if they still name the original installation, RT3 writes
+saves, screenshots and logs there. Do not launch an oracle session until a
+native elevated launcher can temporarily redirect those values to the copy,
+verify the original values are restored immediately after startup, and prove
+that the Save/Load dialog sees the disposable directory. Never weaken file or
+registry permissions to work around access denial.
+
+Keep the actual save directory in a separate `RT3_SAVE_DIR` variable rather
+than inferring it from the executable path. Before saving, require all of:
+
+1. no pre-existing destination file;
+2. a private capture of the expected state;
+3. a private capture of the Save dialog showing the intended short name;
+4. after `Return`, a new `.gms` whose size and SHA-256 are recorded under
+   `RT3_PRIVATE_OUT`.
+
+The independently generated British Isles control save and its derived counts
+are recorded by rt3engine PR #33. Original-game read-back, a second controlled
+save and a fully orchestrated verified launcher remain open.
