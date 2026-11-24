@@ -4,6 +4,56 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if (-not ([System.Management.Automation.PSTypeName]'RT3NativePath').Type) {
+    Add-Type @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+public static class RT3NativePath {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern SafeFileHandle CreateFile(string name, uint access, FileShare share,
+        IntPtr security, FileMode mode, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern uint GetFinalPathNameByHandle(SafeFileHandle file, StringBuilder path,
+        uint capacity, uint flags);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint GetDriveType(string root);
+    public static string GetCanonicalDirectory(string path) {
+        SafeFileHandle handle = CreateFile(path, 0,
+            FileShare.ReadWrite | FileShare.Delete, IntPtr.Zero, FileMode.Open,
+            0x02000000, IntPtr.Zero); // FILE_FLAG_BACKUP_SEMANTICS
+        if (handle.IsInvalid) {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+        using (handle) {
+            uint capacity = 1024;
+            while (true) {
+                StringBuilder result = new StringBuilder((int)capacity);
+                uint length = GetFinalPathNameByHandle(handle, result, capacity, 0);
+                if (length == 0) {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+                if (length < capacity) {
+                    string canonical = result.ToString();
+                    if (canonical.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) {
+                        return @"\\" + canonical.Substring(8);
+                    }
+                    if (canonical.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase)) {
+                        return canonical.Substring(4);
+                    }
+                    return canonical;
+                }
+                capacity = checked(length + 1);
+            }
+        }
+    }
+}
+'@
+}
+
 function Resolve-LocalDirectory {
     param(
         [string]$Path,
@@ -26,7 +76,18 @@ function Resolve-LocalDirectory {
         }
         $component = $component.Parent
     }
-    return (Resolve-Path -LiteralPath $fullPath).Path.TrimEnd('\')
+    $canonical = [RT3NativePath]::GetCanonicalDirectory($fullPath)
+    if (([Uri]$canonical).IsUnc) {
+        throw "$Name resolves to a network/UNC directory, which is not permitted: $canonical"
+    }
+    $root = [IO.Path]::GetPathRoot($canonical)
+    if ([string]::IsNullOrWhiteSpace($root) -or [RT3NativePath]::GetDriveType($root) -ne 3) {
+        throw "$Name must resolve to a direct local fixed disk: $canonical"
+    }
+    if ($canonical.Equals($root, [StringComparison]::OrdinalIgnoreCase)) {
+        return $canonical
+    }
+    return $canonical.TrimEnd('\')
 }
 
 $copy = Resolve-LocalDirectory $env:RT3_HOME 'RT3_HOME'
