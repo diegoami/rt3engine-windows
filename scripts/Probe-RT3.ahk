@@ -15,7 +15,7 @@ if home == "" {
 
 if !WinExist("Railroad Tycoon 3") {
     try {
-        Run '"' home '\RT3.exe"', A_WinDir
+        Run '"' home '\RT3.exe"', home
     } catch Error as e {
         FileAppend "Run failed: " e.Message "`n", logPath
         ExitApp 2
