@@ -124,12 +124,16 @@ saves, screenshots and logs there. Never weaken file or registry permissions
 to work around access denial.
 
 `Start-RT3Disposable.ps1` implements the guarded launcher. It requires an
-already elevated native Windows PowerShell, refuses UNC/original/nested paths,
-requires the disposable `Saved Games` directory, snapshots the original five
-GOG values privately, restores them in `finally` once the game window exists,
-and verifies every restored value. It stops only the RT3 process it started on
-startup/restore failure. It never self-elevates or bypasses UAC. **Its
-privileged positive path remains untested until a UAC-approved run.**
+already elevated native Windows PowerShell, refuses UNC/original/nested paths
+and junction/symbolic-link components, requires the disposable `Saved Games`
+directory, and holds a global named mutex across the process check and complete
+registry override/restore sequence. It snapshots the original five GOG values
+to an exclusively created, GUID-named UTF-8 file and verifies the snapshot by
+reading it back before any registry write. It restores the values in `finally`
+once the game window exists and verifies every restored value. It stops only
+the RT3 process it started on startup/restore failure. It never self-elevates
+or bypasses UAC. **Its privileged positive path remains untested until a
+UAC-approved run.**
 
 ```powershell
 # Run in native Windows PowerShell opened as Administrator.
