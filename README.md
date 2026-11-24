@@ -25,8 +25,10 @@ This is an oracle/tooling project, not a second engine implementation.
 - Original assets and save bytes never enter Git. `.gmc`/`.sav`, captures and
   generated outputs are ignored.
 - Exported saves are copied to rt3engine's gitignored `review-tmp/saves/`
-  area and addressed with `RT3_SAVE`; derived JSON evidence may be committed
-  there after independent review.
+  area **only when a private transfer is actually possible and requested**.
+  A pure Windows installation uses its own private output directory named by
+  `RT3_PRIVATE_OUT`; no WSL path or shared filesystem is assumed.
+- Derived JSON evidence may be committed by rt3engine after independent review.
 - If a workflow also drives a Linux emulator/display, honor rt3engine's shared
   capture lock in `tools/oracle/capture_lock.py`.
 
@@ -40,7 +42,9 @@ Example (PowerShell):
 
 ```powershell
 $env:RT3_HOME = 'D:\RT3-oracle'  # disposable copy, not the original install
-& 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe' .\scripts\Probe-RT3.ahk .\out\probe.txt
+$env:RT3_PRIVATE_OUT = Join-Path $env:LOCALAPPDATA 'RT3Engine-private'
+New-Item -ItemType Directory -Force $env:RT3_PRIVATE_OUT | Out-Null
+& 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe' .\scripts\Probe-RT3.ahk (Join-Path $env:RT3_PRIVATE_OUT 'probe.txt')
 ```
 
 The next milestone is a deterministic, non-destructive controlled-save script
