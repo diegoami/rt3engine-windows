@@ -120,11 +120,36 @@ not a screenshot alone, are the proof of success.
 A disposable copy at `RT3_HOME` is not enough. This GOG installation reads
 `HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\1445251062`, including `PATH` and
 `SAVEGAMEFOLDER`; if they still name the original installation, RT3 writes
-saves, screenshots and logs there. Do not launch an oracle session until a
-native elevated launcher can temporarily redirect those values to the copy,
-verify the original values are restored immediately after startup, and prove
-that the Save/Load dialog sees the disposable directory. Never weaken file or
-registry permissions to work around access denial.
+saves, screenshots and logs there. Never weaken file or registry permissions
+to work around access denial.
+
+`Start-RT3Disposable.ps1` implements the guarded launcher. It requires an
+already elevated native Windows PowerShell, canonicalizes directories from
+opened filesystem handles, and refuses UNC/original/nested paths,
+junction/symbolic-link components, mapped network drives and non-fixed disks.
+This resolves `SUBST` and short-name aliases before comparison. It requires
+the disposable `Saved Games` directory and holds a global named mutex across
+the process check and complete
+registry override/restore sequence. It snapshots the original five GOG values
+to an exclusively created, GUID-named UTF-8 file and verifies the snapshot by
+reading it back before any registry write. It restores the values in `finally`
+once the game window exists and verifies every restored value. It stops only
+the RT3 process it started on startup/restore failure. It never self-elevates
+or bypasses UAC. **Its privileged positive path remains untested until a
+UAC-approved run.**
+
+```powershell
+# Run in native Windows PowerShell opened as Administrator.
+$env:RT3_HOME = 'D:\RT3-oracle'
+$env:RT3_SAVE_DIR = 'D:\RT3-oracle\Saved Games'
+$env:RT3_PRIVATE_OUT = Join-Path $env:LOCALAPPDATA 'RT3Engine-private'
+New-Item -ItemType Directory -Force $env:RT3_SAVE_DIR,$env:RT3_PRIVATE_OUT | Out-Null
+& .\scripts\Start-RT3Disposable.ps1
+```
+
+The game inherits elevation, so run the AutoHotkey helpers from the same
+elevated PowerShell. After startup, prove that the Save/Load dialog sees the
+disposable directory before any save; otherwise close RT3 and stop.
 
 Keep the actual save directory in a separate `RT3_SAVE_DIR` variable rather
 than inferring it from the executable path. Before saving, require all of:
