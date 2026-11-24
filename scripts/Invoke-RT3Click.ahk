@@ -11,19 +11,33 @@ title := A_Args[3]
 logPath := A_Args[4]
 count := A_Args.Length >= 5 ? Integer(A_Args[5]) : 1
 hold := A_Args.Length >= 6 ? Integer(A_Args[6]) : 0
-if !WinExist(title) {
+window := WinExist(title)
+if !window {
     FileAppend "window not found: " title "`n", logPath
     ExitApp 2
 }
-WinRestore title
-WinActivate title
-if !WinWaitActive(title, , 5) {
+target := "ahk_id " window
+if WinGetTitle(target) != "Railroad Tycoon 3" || WinGetProcessName(target) != "RT3.exe" {
+    FileAppend "not the RT3 game window: " title "`n", logPath
+    ExitApp 2
+}
+WinRestore target
+WinActivate target
+if WinWaitActive(target, , 5) != window {
     FileAppend "window not active: " title "`n", logPath
     ExitApp 2
 }
-WinGetClientPos , , &width, &height, title
+WinGetClientPos , , &width, &height, target
 if width != 800 || height != 600 {
     FileAppend "expected 800x600 client, got " width "x" height "`n", logPath
+    ExitApp 2
+}
+if x < 0 || x >= width || y < 0 || y >= height {
+    FileAppend "coordinates outside client: " x "," y "`n", logPath
+    ExitApp 2
+}
+if WinActive(target) != window {
+    FileAppend "RT3 lost focus before click`n", logPath
     ExitApp 2
 }
 MouseMove x, y, 50

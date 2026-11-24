@@ -55,21 +55,39 @@ passed their missing-window negative-path checks; their positive-path rerun
 awaits verified save-path isolation. They are building blocks, **not an
 untested claim of one-shot start-to-save orchestration**:
 
-- `Invoke-RT3Click.ahk` restores/activates RT3, refuses any client size other
-  than 800×600, then uses fixed client coordinates with a slow pointer move.
-- `Invoke-RT3Key.ahk` and `Invoke-RT3Text.ahk` send keyboard input and literal
-  text to the restored/active game window.
-- `Capture-RT3Window.ps1` captures only the RT3 window through Windows GDI;
-  captures go to the requested private output path.
+- All input helpers bind one HWND whose exact title is `Railroad Tycoon 3`
+  and whose process is `RT3.exe`; they refuse other or ambiguous windows.
+- `Invoke-RT3Click.ahk` restores/activates that HWND, refuses any client size
+  other than 800×600 and rejects coordinates outside the client before moving
+  the pointer.
+- `Invoke-RT3Key.ahk` and `Invoke-RT3Text.ahk` verify that the same HWND is
+  active immediately before sending keyboard input or literal text.
+- `Capture-RT3Window.ps1` targets the unique RT3 window with `PrintWindow`; it
+  never samples a screen rectangle and throws if window capture fails. DirectX
+  output can still be blank, so every image must be checked for the expected
+  game content. Captures go to the requested private output path.
+
+PowerShell 5.1 does not automatically stop on a nonzero native exit code.
+Check `$LASTEXITCODE` after every helper and inspect each capture before the
+next input:
 
 ```powershell
+$ErrorActionPreference = 'Stop'
 $ahk = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
 $title = 'Railroad Tycoon 3'
 $log = Join-Path $env:RT3_PRIVATE_OUT 'input.log'
 & $ahk .\scripts\Invoke-RT3Click.ahk 438 138 $title $log 1
-& $ahk .\scripts\Invoke-RT3Key.ahk '{Enter}' $title $log
+if ($LASTEXITCODE) { throw 'Save click failed' }
+& .\scripts\Capture-RT3Window.ps1 -OutputPath (Join-Path $env:RT3_PRIVATE_OUT 'save-dialog.png')
+# Inspect save-dialog.png before entering a name.
+& $ahk .\scripts\Invoke-RT3Click.ahk 390 348 $title $log 1
+if ($LASTEXITCODE) { throw 'Filename-field click failed' }
 & $ahk .\scripts\Invoke-RT3Text.ahk 'rt3a204828' $title $log
-& .\scripts\Capture-RT3Window.ps1 -OutputPath (Join-Path $env:RT3_PRIVATE_OUT 'state.png')
+if ($LASTEXITCODE) { throw 'Filename input failed' }
+& .\scripts\Capture-RT3Window.ps1 -OutputPath (Join-Path $env:RT3_PRIVATE_OUT 'save-name.png')
+# Inspect save-name.png and prove the destination does not already exist.
+& $ahk .\scripts\Invoke-RT3Key.ahk '{Enter}' $title $log
+if ($LASTEXITCODE) { throw 'Save confirmation failed' }
 ```
 
 The successful scenario route was Single Player `(365,235)`, New Scenario

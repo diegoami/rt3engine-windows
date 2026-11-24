@@ -16,15 +16,20 @@ public static class RT3Window {
     public struct RECT { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
-    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr dc, uint flags);
 }
 '@
-$process = Get-Process RT3 -ErrorAction Stop | Select-Object -First 1
+$processes = @(Get-Process RT3 -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero })
+if ($processes.Count -ne 1) {
+    throw "Expected exactly one RT3 game window, found $($processes.Count)"
+}
+$process = $processes[0]
 [void][RT3Window]::ShowWindow($process.MainWindowHandle, 9)
-[void][RT3Window]::SetForegroundWindow($process.MainWindowHandle)
 Start-Sleep -Milliseconds 500
 $rect = New-Object RT3Window+RECT
-[void][RT3Window]::GetWindowRect($process.MainWindowHandle, [ref]$rect)
+if (-not [RT3Window]::GetWindowRect($process.MainWindowHandle, [ref]$rect)) {
+    throw 'Cannot read RT3 window bounds'
+}
 $width = $rect.Right - $rect.Left
 $height = $rect.Bottom - $rect.Top
 if ($width -le 0 -or $height -le 0) {
@@ -32,12 +37,19 @@ if ($width -le 0 -or $height -le 0) {
 }
 $bitmap = New-Object System.Drawing.Bitmap($width, $height)
 $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+$dc = [IntPtr]::Zero
 try {
-    $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
+    $dc = $graphics.GetHdc()
+    if (-not [RT3Window]::PrintWindow($process.MainWindowHandle, $dc, 2)) {
+        throw 'PrintWindow failed for the RT3 game window; no screen-crop fallback is permitted'
+    }
     $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
 }
 finally {
+    if ($dc -ne [IntPtr]::Zero) {
+        $graphics.ReleaseHdc($dc)
+    }
     $graphics.Dispose()
     $bitmap.Dispose()
 }
-Write-Output "Captured ${width}x${height} to $OutputPath"
+Write-Output "Captured ${width}x${height} from the RT3 window to $OutputPath"
