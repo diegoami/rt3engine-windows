@@ -18,10 +18,10 @@ This is an oracle/tooling project, not a second engine implementation.
 
 - Use a **disposable copy** of RT3 for oracle runs. The owner's original GOG
   installation remains read-only.
-- A native session needs a working hardware-accelerated DirectX 8.1 device.
-  The initial WSL host's native attempt returned exactly that DirectX error;
-  AutoHotkey itself worked. Use a Windows machine/VM/session with suitable
-  graphics rather than weakening the original game's device check.
+- A native session may report missing hardware-accelerated DirectX 8.1 while
+  remaining playable after the warning is dismissed. Record and dismiss that
+  warning with OK, then verify the actual game window. Stop only if no playable
+  window follows. Do not bypass or alter the game's device check.
 - Original assets and save bytes never enter Git. `.gmc`/`.sav`, captures and
   generated outputs are ignored.
 - Exported saves are copied to rt3engine's gitignored `review-tmp/saves/`

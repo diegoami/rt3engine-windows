@@ -14,15 +14,25 @@ if home == "" {
 }
 
 if !WinExist("Railroad Tycoon 3") {
-    Run '"' home '\RT3.exe"', home
+    try {
+        Run '"' home '\RT3.exe"', A_WinDir
+    } catch Error as e {
+        FileAppend "Run failed: " e.Message "`n", logPath
+        ExitApp 2
+    }
 }
 if !WinWait("Railroad Tycoon 3", , 60) {
     if WinExist("Program Error") {
         FileAppend WinGetText("Program Error") "`n", logPath
+        ControlClick "OK", "Program Error"
+        if !WinWait("Railroad Tycoon 3", , 60) {
+            FileAppend "No playable RT3 window after dismissing warning`n", logPath
+            ExitApp 2
+        }
     } else {
         FileAppend "No RT3 window or Program Error dialog`n", logPath
+        ExitApp 2
     }
-    ExitApp 2
 }
 WinGetClientPos &x, &y, &w, &h, "Railroad Tycoon 3"
 FileAppend "client=" x "," y " " w "x" h "`n", logPath
