@@ -54,6 +54,22 @@ public static class RT3NativePath {
 '@
 }
 
+function Test-DirectoryWithin {
+    param(
+        [string]$Candidate,
+        [string]$Root
+    )
+    $comparison = [StringComparison]::OrdinalIgnoreCase
+    if ($Candidate.Equals($Root, $comparison)) {
+        return $true
+    }
+    $prefix = $Root
+    if (-not $Root.EndsWith('\')) {
+        $prefix = "$Root\"
+    }
+    return $Candidate.StartsWith($prefix, $comparison)
+}
+
 function Resolve-LocalDirectory {
     param(
         [string]$Path,
@@ -125,15 +141,14 @@ try {
         $original[$name] = (Get-ItemProperty -LiteralPath $keyPath -Name $name).$name
     }
     $originalRoot = Resolve-LocalDirectory $original.PATH 'GOG registry PATH'
-    $comparison = [StringComparison]::OrdinalIgnoreCase
-    if ($copy.Equals($originalRoot, $comparison) -or $copy.StartsWith("$originalRoot\", $comparison)) {
+    if (Test-DirectoryWithin $copy $originalRoot) {
         throw "RT3_HOME must be outside the original installation: $originalRoot"
     }
-    if ($privateOut.Equals($originalRoot, $comparison) -or $privateOut.StartsWith("$originalRoot\", $comparison)) {
+    if (Test-DirectoryWithin $privateOut $originalRoot) {
         throw 'RT3_PRIVATE_OUT must be outside the original installation'
     }
     $expectedSaveDir = [IO.Path]::GetFullPath((Join-Path $copy 'Saved Games')).TrimEnd('\')
-    if (-not $saveDir.Equals($expectedSaveDir, $comparison)) {
+    if (-not $saveDir.Equals($expectedSaveDir, [StringComparison]::OrdinalIgnoreCase)) {
         throw "RT3_SAVE_DIR must be the disposable copy's Saved Games directory: $expectedSaveDir"
     }
 
