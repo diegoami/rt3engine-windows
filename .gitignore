@@ -1,0 +1,7 @@
+out/
+captures/
+saves/
+*.gmc
+*.sav
+*.png
+*.xwd

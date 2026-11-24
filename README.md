@@ -1,0 +1,48 @@
+# rt3engine-windows
+
+Windows-side companion for [rt3engine](https://github.com/diegoami/rt3engine).
+
+## Purpose
+
+Own tasks that need a native Windows session rather than the Linux/Wine
+development environment:
+
+- AutoHotkey v2 window/input automation for Railroad Tycoon 3;
+- native screen/window capture;
+- controlled original save generation and read-only export;
+- future Windows-only diagnostics needed by rt3engine.
+
+This is an oracle/tooling project, not a second engine implementation.
+
+## Environment boundary
+
+- Use a **disposable copy** of RT3 for oracle runs. The owner's original GOG
+  installation remains read-only.
+- A native session needs a working hardware-accelerated DirectX 8.1 device.
+  The initial WSL host's native attempt returned exactly that DirectX error;
+  AutoHotkey itself worked. Use a Windows machine/VM/session with suitable
+  graphics rather than weakening the original game's device check.
+- Original assets and save bytes never enter Git. `.gmc`/`.sav`, captures and
+  generated outputs are ignored.
+- Exported saves are copied to rt3engine's gitignored `review-tmp/saves/`
+  area and addressed with `RT3_SAVE`; derived JSON evidence may be committed
+  there after independent review.
+- If a workflow also drives a Linux emulator/display, honor rt3engine's shared
+  capture lock in `tools/oracle/capture_lock.py`.
+
+## Initial diagnostic
+
+`Probe-RT3.ahk` is an AutoHotkey v2 diagnostic that starts RT3 from a supplied
+`RT3_HOME`, waits for its window, records client dimensions, and captures any
+`Program Error` text. It does not claim save automation yet.
+
+Example (PowerShell):
+
+```powershell
+$env:RT3_HOME = 'D:\RT3-oracle'  # disposable copy, not the original install
+& 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe' .\scripts\Probe-RT3.ahk .\out\probe.txt
+```
+
+The next milestone is a deterministic, non-destructive controlled-save script
+with proof of the produced file and state. That remains unimplemented until it
+has been run on a suitable Windows session.
