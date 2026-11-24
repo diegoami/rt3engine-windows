@@ -68,26 +68,38 @@ untested claim of one-shot start-to-save orchestration**:
   game content. Captures go to the requested private output path.
 
 PowerShell 5.1 does not automatically stop on a nonzero native exit code.
-Check `$LASTEXITCODE` after every helper and inspect each capture before the
-next input:
+Check `$LASTEXITCODE` after every helper. This example uses the same short name
+for input and destination checks, requires explicit inspection confirmations,
+and refuses an existing destination both before input and immediately before
+saving:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
+if (-not $env:RT3_SAVE_DIR) { throw 'RT3_SAVE_DIR is unset' }
+$saveDir = (Resolve-Path -LiteralPath $env:RT3_SAVE_DIR).Path
+$name = 'rt3a' + (Get-Date -Format 'HHmmss')
+$savePath = Join-Path $saveDir "$name.gms"
+if (Test-Path -LiteralPath $savePath) { throw "Refusing to overwrite $savePath" }
 $ahk = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
 $title = 'Railroad Tycoon 3'
 $log = Join-Path $env:RT3_PRIVATE_OUT 'input.log'
 & $ahk .\scripts\Invoke-RT3Click.ahk 438 138 $title $log 1
 if ($LASTEXITCODE) { throw 'Save click failed' }
 & .\scripts\Capture-RT3Window.ps1 -OutputPath (Join-Path $env:RT3_PRIVATE_OUT 'save-dialog.png')
-# Inspect save-dialog.png before entering a name.
+if ((Read-Host 'Inspect save-dialog.png; type YES to continue') -ne 'YES') { throw 'Save dialog not verified' }
 & $ahk .\scripts\Invoke-RT3Click.ahk 390 348 $title $log 1
 if ($LASTEXITCODE) { throw 'Filename-field click failed' }
-& $ahk .\scripts\Invoke-RT3Text.ahk 'rt3a204828' $title $log
+& $ahk .\scripts\Invoke-RT3Text.ahk $name $title $log
 if ($LASTEXITCODE) { throw 'Filename input failed' }
 & .\scripts\Capture-RT3Window.ps1 -OutputPath (Join-Path $env:RT3_PRIVATE_OUT 'save-name.png')
-# Inspect save-name.png and prove the destination does not already exist.
+if ((Read-Host 'Inspect save-name.png; type YES to continue') -ne 'YES') { throw 'Save name not verified' }
+if (Test-Path -LiteralPath $savePath) { throw "Refusing to overwrite $savePath" }
 & $ahk .\scripts\Invoke-RT3Key.ahk '{Enter}' $title $log
 if ($LASTEXITCODE) { throw 'Save confirmation failed' }
+Start-Sleep -Seconds 3
+if (-not (Test-Path -LiteralPath $savePath)) { throw "Save was not created at $savePath" }
+Get-Item -LiteralPath $savePath | Select-Object FullName,Length,LastWriteTime
+Get-FileHash -Algorithm SHA256 -LiteralPath $savePath
 ```
 
 The successful scenario route was Single Player `(365,235)`, New Scenario

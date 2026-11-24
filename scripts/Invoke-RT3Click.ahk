@@ -2,7 +2,7 @@
 SetTitleMatchMode 2
 CoordMode "Mouse", "Client"
 if A_Args.Length < 4 {
-    MsgBox "Usage: Invoke-RT3Click.ahk <x> <y> <window-title> <log-file> [count] [hold-ms]"
+    MsgBox "Usage: Invoke-RT3Click.ahk <x> <y> <window-title> <log-file> [count]"
     ExitApp 2
 }
 x := Integer(A_Args[1])
@@ -10,7 +10,6 @@ y := Integer(A_Args[2])
 title := A_Args[3]
 logPath := A_Args[4]
 count := A_Args.Length >= 5 ? Integer(A_Args[5]) : 1
-hold := A_Args.Length >= 6 ? Integer(A_Args[6]) : 0
 window := WinExist(title)
 if !window {
     FileAppend "window not found: " title "`n", logPath
@@ -36,17 +35,11 @@ if x < 0 || x >= width || y < 0 || y >= height {
     FileAppend "coordinates outside client: " x "," y "`n", logPath
     ExitApp 2
 }
+MouseMove x, y, 50
+Sleep 250
 if WinActive(target) != window {
     FileAppend "RT3 lost focus before click`n", logPath
     ExitApp 2
 }
-MouseMove x, y, 50
-Sleep 250
-if hold > 0 {
-    MouseClick "Left", x, y, 1, 0, "D"
-    Sleep hold
-    MouseClick "Left", x, y, 1, 0, "U"
-} else {
-    MouseClick "Left", x, y, count, 0
-}
-FileAppend "click " x "," y " count=" count " hold=" hold "`n", logPath
+MouseClick "Left", x, y, count, 0
+FileAppend "click " x "," y " count=" count "`n", logPath

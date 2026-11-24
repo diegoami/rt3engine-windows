@@ -8,7 +8,8 @@ if ($DelaySeconds -gt 0) {
     Start-Sleep -Seconds $DelaySeconds
 }
 Add-Type -AssemblyName System.Drawing
-Add-Type @'
+if (-not ([System.Management.Automation.PSTypeName]'RT3Window').Type) {
+    Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class RT3Window {
@@ -19,6 +20,7 @@ public static class RT3Window {
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr dc, uint flags);
 }
 '@
+}
 $processes = @(Get-Process RT3 -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero })
 if ($processes.Count -ne 1) {
     throw "Expected exactly one RT3 game window, found $($processes.Count)"
